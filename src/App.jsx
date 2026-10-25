@@ -3,7 +3,7 @@ import { OrbitControls } from '@react-three/drei'
 import { useEffect, useRef, useState } from 'react'
 import Robot, { HARDWARE } from './components/Robot.jsx'
 import Terrain from './components/Terrain.jsx'
-import CameraRig from './components/CinematicCamera.jsx'
+import CameraRig, { FREE_DISTANCE } from './components/CinematicCamera.jsx'
 
 const COLORS = [
   { name: 'Stone', value: null, swatch: '#8c6d4d' },
@@ -17,6 +17,11 @@ const COLORS = [
     swatch: 'linear-gradient(135deg, #eef0f3, #9aa0a8 48%, #1d1e21 52%, #3a3c41)',
   },
 ]
+
+// One zoom scale for every view: 1 = 100%, larger = further out.
+const ZOOM_MIN = 0.35
+const ZOOM_MAX = 2.5
+const clampZoom = (z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z))
 
 const VIEWS = [
   { id: 'free', label: 'Free', key: '1' },
@@ -50,27 +55,36 @@ export default function App() {
   const [dark, setDark] = useState(true)
   const [mechanics, setMechanics] = useState(true)
   const [wander, setWander] = useState(true)
-  const [view, setView] = useState('free')
+  const [view, setView] = useState('cinematic')
   const cinematic = view === 'cinematic'
-  const [zoom, setZoom] = useState(1) // distance multiplier for the directed views
+  const [zoom, setZoom] = useState(2.5) // camera distance multiplier, shown as 100/zoom % (2.5 = 40%)
   const [shot, setShot] = useState('')
   const bg = dark ? '#16161a' : '#f4f4f2'
   const controls = useRef()
   const robot = useRef()
   const previews = useRef({}) // live preview window per view
 
-  // factor < 1 zooms in. Free view dollies the orbit camera; directed views scale their distance.
-  const zoomBy = (factor) => {
-    if (view !== 'free') {
-      setZoom((z) => Math.min(2.5, Math.max(0.35, z * factor)))
-      return
-    }
+  // Set the zoom for every view. In free view the orbit camera is moved to the matching distance.
+  const applyZoom = (z) => {
+    const next = clampZoom(z)
+    setZoom(next)
     const c = controls.current
-    if (!c) return
-    const offset = c.object.position.clone().sub(c.target)
-    offset.setLength(Math.min(c.maxDistance, Math.max(c.minDistance, offset.length() * factor)))
-    c.object.position.copy(c.target).add(offset)
-    c.update()
+    if (view === 'free' && c) {
+      const offset = c.object.position.clone().sub(c.target)
+      offset.setLength(FREE_DISTANCE * next)
+      c.object.position.copy(c.target).add(offset)
+      c.update()
+    }
+  }
+  // factor < 1 zooms in
+  const zoomBy = (factor) => applyZoom(zoom * factor)
+
+  // the mouse wheel moves the orbit camera directly in free view: mirror its distance into the zoom value
+  const syncZoomFromControls = () => {
+    const c = controls.current
+    if (!c || view !== 'free') return
+    const z = c.object.position.distanceTo(c.target) / FREE_DISTANCE
+    setZoom((prev) => (Math.abs(prev - z) > 0.005 ? z : prev))
   }
   const zoomRef = useRef(zoomBy)
   zoomRef.current = zoomBy
@@ -101,7 +115,14 @@ export default function App() {
         <hemisphereLight args={['#ffffff', '#b9a58c', dark ? 1.1 : 1.6]} />
         <Terrain dark={dark} />
         <Robot color={color} controls={controls} showMechanics={mechanics} wander={wander} stateRef={robot} />
-        <OrbitControls ref={controls} target={[0, 3.5, 0]} maxPolarAngle={Math.PI / 2.05} minDistance={4} maxDistance={24} />
+        <OrbitControls
+          ref={controls}
+          target={[0, 3.5, 0]}
+          maxPolarAngle={Math.PI / 2.05}
+          minDistance={FREE_DISTANCE * ZOOM_MIN}
+          maxDistance={FREE_DISTANCE * ZOOM_MAX}
+          onChange={syncZoomFromControls}
+        />
         <CameraRig mode={view} robot={robot} controls={controls} onShot={setShot} zoom={zoom} previews={previews} />
       </Canvas>
       <div className={`letterbox ${cinematic ? 'on' : ''}`}>
@@ -155,7 +176,7 @@ export default function App() {
             aria-label="Reset zoom"
             title="Reset zoom"
             className="reset"
-            onClick={(e) => (setZoom(1), e.currentTarget.blur())}
+            onClick={(e) => (applyZoom(1), e.currentTarget.blur())}
           >
             {Math.round(100 / zoom)}%
           </button>

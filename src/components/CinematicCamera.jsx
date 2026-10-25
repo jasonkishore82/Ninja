@@ -1,6 +1,7 @@
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+import { heightAt } from './Terrain.jsx'
 
 const SHOT_LENGTH = 6.5 // seconds per shot before cutting to the next
 
@@ -62,6 +63,25 @@ const VIEWS = {
   },
 }
 
+// How much a camera must rise so it stays above the ground and the terrain doesn't block
+// its line of sight to the robot: sample the sight line and find the worst intrusion.
+const CLEARANCE = 0.8
+const _sample = new THREE.Vector3()
+function liftNeeded(from, to) {
+  let lift = 0
+  for (let i = 0; i < 12; i++) {
+    const f = i / 12 // 0 = at the camera, approaching the subject
+    _sample.lerpVectors(from, to, f)
+    const intrusion = heightAt(_sample.x, _sample.z) + CLEARANCE - _sample.y
+    // raising the camera by d raises this point on the sight line by d * (1 - f)
+    if (intrusion > 0) lift = Math.max(lift, intrusion / (1 - f))
+  }
+  return lift
+}
+
+// Free (orbit) camera distance from its target at 100% zoom.
+export const FREE_DISTANCE = 15
+
 const DIRECTED = ['top', 'side', 'cinematic']
 const ALL = ['free', ...DIRECTED]
 
@@ -72,6 +92,7 @@ function makeRigCamera() {
     shotStart: 0,
     snap: true,
     zoom: 1,
+    lift: 0,
     pos: new THREE.Vector3(),
     look: new THREE.Vector3(),
     wantPos: new THREE.Vector3(),
@@ -99,6 +120,9 @@ export default function CameraRig({ mode, robot, controls, onShot, zoom = 1, pre
     [],
   )
 
+  const zoomNow = useRef(zoom)
+  zoomNow.current = zoom
+
   // Shadows are rendered once per frame (for the main view) and reused by the previews.
   useEffect(() => {
     gl.shadowMap.autoUpdate = false
@@ -112,7 +136,8 @@ export default function CameraRig({ mode, robot, controls, onShot, zoom = 1, pre
     if (!c) return
     c.enabled = mode === 'free'
     if (mode === 'free') {
-      // pick up the free camera where it was left
+      // pick up the free camera where it was left, at the current zoom distance
+      rig.freeOffset.setLength(FREE_DISTANCE * zoomNow.current)
       camera.position.copy(c.target).add(rig.freeOffset)
       camera.fov = 40
       camera.updateProjectionMatrix()
@@ -148,6 +173,7 @@ export default function CameraRig({ mode, robot, controls, onShot, zoom = 1, pre
         view.place(rig.p, rig.fwd, rig.right, t - r.shotStart, r.wantPos)
         view.look(rig.p, rig.fwd, r.wantLook)
 
+        const cutNow = r.snap
         if (r.snap) {
           r.pos.copy(r.wantPos)
           r.look.copy(r.wantLook)
@@ -161,9 +187,15 @@ export default function CameraRig({ mode, robot, controls, onShot, zoom = 1, pre
           r.cam.fov += (view.fov - r.cam.fov) * k
         }
 
-        // zoom slides the camera along its line to the subject
-        r.zoom += (zoom - r.zoom) * (1 - Math.exp(-dt * 8))
+        // zoom slides the camera along its line to the subject; only the selected view is zoomed,
+        // so the other previews always show a well-framed shot
+        r.zoom += ((id === mode ? zoom : 1) - r.zoom) * (1 - Math.exp(-dt * 8))
         r.cam.position.subVectors(r.pos, r.look).multiplyScalar(r.zoom).add(r.look)
+
+        // terrain avoidance: rise smoothly over hills that would bury the camera or block the shot
+        const lift = liftNeeded(r.cam.position, r.look)
+        r.lift = cutNow ? lift : r.lift + (lift - r.lift) * (1 - Math.exp(-dt * (lift > r.lift ? 6 : 1.5)))
+        r.cam.position.y += r.lift
         if (id === 'cinematic') {
           // subtle handheld drift
           r.cam.position.x += Math.sin(t * 0.9) * 0.06
