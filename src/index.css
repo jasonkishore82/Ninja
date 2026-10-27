@@ -1,0 +1,276 @@
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: #f4f4f2;
+  font-family: system-ui, sans-serif;
+}
+
+.hint {
+  position: fixed;
+  left: 16px;
+  bottom: 12px;
+  font-size: 13px;
+  color: #666;
+  pointer-events: none;
+}
+
+.topbar {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.flip {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  border: 0;
+  border-radius: 13px;
+  background: #bbb;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.flip.on {
+  background: #4a4a58;
+}
+
+.flip .knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.2s;
+}
+
+.flip.on .knob {
+  transform: translateX(22px);
+}
+
+.swatches {
+  display: flex;
+  gap: 8px;
+}
+
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+
+.swatch.sel {
+  box-shadow: 0 0 0 2px #2d7ff9;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #777;
+  user-select: none;
+}
+
+/* cinematic letterbox: black bars slide in top and bottom */
+.letterbox {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.letterbox::before,
+.letterbox::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 11vh;
+  background: #000;
+  transition: transform 0.6s ease;
+}
+
+.letterbox::before {
+  top: 0;
+  transform: translateY(-100%);
+}
+
+.letterbox::after {
+  bottom: 0;
+  transform: translateY(100%);
+}
+
+.letterbox.on::before,
+.letterbox.on::after {
+  transform: translateY(0);
+}
+
+.shot-label {
+  position: absolute;
+  right: 24px;
+  bottom: calc(11vh + 12px);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.topbar {
+  z-index: 1;
+}
+
+/* camera view switcher + zoom, right edge */
+.views {
+  position: fixed;
+  right: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 14px;
+  background: rgba(128, 128, 128, 0.18);
+  backdrop-filter: blur(6px);
+}
+
+.views button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 112px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #333;
+  font: 600 13px system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.views button:hover {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.views button.sel {
+  background: #2d7ff9;
+  color: #fff;
+}
+
+.views .key {
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.12);
+  font-size: 11px;
+}
+
+.views .zoom {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(128, 128, 128, 0.35);
+}
+
+.views .zoom button {
+  min-width: 0;
+  flex: 1;
+  justify-content: center;
+  padding: 6px 0;
+  font-size: 16px;
+}
+
+.views .zoom button.reset {
+  flex: 1.6;
+  font-size: 11px;
+}
+
+/* live preview tiles: the panel itself must stay clear (no blur) so the previews show through */
+.views {
+  padding: 0;
+  background: transparent;
+  backdrop-filter: none;
+  gap: 8px;
+}
+
+.views button.tile,
+.views button.tile:hover,
+.views button.tile.sel {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.tile .preview {
+  display: block;
+  width: 168px;
+  height: 94px;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+}
+
+.tile .label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  border-radius: 0 0 10px 10px;
+  background: rgba(255, 255, 255, 0.6);
+  transition: background 0.15s;
+}
+
+.tile:hover .label {
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.tile.sel .preview {
+  border-color: #2d7ff9;
+}
+
+.tile.sel .label {
+  background: #2d7ff9;
+  color: #fff;
+}
+
+.views .zoom {
+  margin-top: 0;
+  padding: 6px;
+  border-top: 0;
+  border-radius: 10px;
+  background: rgba(128, 128, 128, 0.25);
+  backdrop-filter: blur(6px);
+}
+
+@media (max-height: 720px) {
+  .tile .preview {
+    width: 128px;
+    height: 72px;
+  }
+}
